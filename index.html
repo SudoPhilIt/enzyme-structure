@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GAO-mut321 · 3D Structure Viewer</title>
+<title>Enzyme 3D Structure Viewer</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #111; color: #ddd; min-height: 100vh; display: flex; flex-direction: column; }
-  header { padding: 14px 20px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header { padding: 12px 20px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   header h1 { font-size: 15px; font-weight: 500; color: #fff; }
   header p { font-size: 12px; color: #888; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-left: auto; }
   .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #999; }
   .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
   .dot.round { border-radius: 50%; }
-  #viewer { width: 100%; flex: 1; min-height: calc(100vh - 130px); position: relative; background: #000; }
-  #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #666; font-size: 13px; }
+  #viewer { width: 100%; flex: 1; min-height: calc(100vh - 140px); position: relative; background: #000; }
+  #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #666; font-size: 13px; text-align: center; }
   .toolbar { padding: 10px 16px; background: #1a1a1a; border-top: 1px solid #2a2a2a; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .toolbar-group { display: flex; gap: 6px; align-items: center; }
   .toolbar-label { font-size: 11px; color: #666; margin-right: 2px; }
@@ -23,28 +23,23 @@
   button:hover { background: #303030; color: #fff; }
   button:disabled { opacity: 0.4; cursor: default; }
   button.active { background: #2a3a5a; border-color: #4477cc; color: #aac4ee; }
+  select { font-size: 12px; padding: 5px 10px; background: #252525; color: #ccc; border: 1px solid #333; border-radius: 6px; cursor: pointer; }
+  select:focus { outline: none; border-color: #4477cc; }
   .sep { width: 1px; height: 20px; background: #2a2a2a; margin: 0 4px; }
   #status { font-size: 12px; color: #888; margin-left: 8px; }
   #rec { display: none; font-size: 11px; color: #ff4444; position: absolute; top: 12px; right: 14px; font-weight: 500; }
   #output { display: none; padding: 16px 20px; background: #1a1a1a; border-top: 1px solid #2a2a2a; }
   #output p { font-size: 12px; color: #888; margin-bottom: 10px; }
-  #output img, #output video { max-width: 100%; border-radius: 6px; display: block; }
-  #output video { background: #000; }
+  #output video { max-width: 100%; border-radius: 6px; display: block; background: #000; }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>Galactose oxidase · PDB 1GOG</h1>
-    <p>GAO-mut321 parent · Fusarium graminearum · drag to rotate · scroll to zoom</p>
+    <h1 id="hdr-title">Enzyme 3D Structure Viewer</h1>
+    <p id="hdr-subtitle">drag to rotate · scroll to zoom</p>
   </div>
-  <div class="legend">
-    <div class="legend-item"><span class="dot" style="background:#6699cc"></span>backbone</div>
-    <div class="legend-item"><span class="dot" style="background:#e84444"></span>548–605 hotspot</div>
-    <div class="legend-item"><span class="dot" style="background:#f5a623"></span>267–305 hotspot</div>
-    <div class="legend-item"><span class="dot" style="background:#44bb77"></span>430–436 hotspot</div>
-    <div class="legend-item"><span class="dot round" style="background:#aa44ff"></span>Cu²⁺</div>
-  </div>
+  <div class="legend" id="legend"></div>
 </header>
 
 <div id="viewer">
@@ -53,6 +48,15 @@
 </div>
 
 <div class="toolbar">
+  <div class="toolbar-group">
+    <span class="toolbar-label">enzyme</span>
+    <select id="enzymeSelect" onchange="loadEnzyme(this.value)">
+      <option value="gao">Galactose oxidase (1GOG)</option>
+      <option value="gox">Glucose oxidase (1CF3)</option>
+      <option value="hrp">HRP C1A (1ATJ)</option>
+    </select>
+  </div>
+  <div class="sep"></div>
   <div class="toolbar-group">
     <span class="toolbar-label">style</span>
     <button id="btnRibbon" class="active" onclick="setStyle('cartoon')">ribbon</button>
@@ -73,9 +77,9 @@
   <div class="sep"></div>
   <div class="toolbar-group">
     <span class="toolbar-label">export</span>
-    <button onclick="copyPNG()" id="copyBtn">copy PNG</button>
-    <button onclick="savePNG()" id="saveBtn">save PNG</button>
-<button onclick="startVideo()" id="vidBtn">save video (5s)</button>
+    <button onclick="copyPNG()">copy PNG</button>
+    <button onclick="savePNG()">save PNG</button>
+    <button onclick="startVideo()" id="vidBtn">save video (5s)</button>
   </div>
   <span id="status"></span>
 </div>
@@ -87,22 +91,70 @@
 
 <script src="https://cdn.jsdelivr.net/npm/3dmol@2.0.3/build/3Dmol-min.js"></script>
 <script>
-let viewer, spinning = false, currentStyle = 'cartoon', currentBg = 'black';
-const r548 = [], r267 = [], r430 = [], activeSite = [228,272,290,406,495,496,531,581];
-for (let i = 548; i <= 605; i++) r548.push(i);
-for (let i = 267; i <= 305; i++) r267.push(i);
-for (let i = 430; i <= 436; i++) r430.push(i);
+const BASE = 'https://cdn.jsdelivr.net/gh/SudoPhilIt/gao-structure@main/';
+
+const ENZYMES = {
+  gao: {
+    file: '1gog_backbone.pdb',
+    title: 'Galactose oxidase · PDB 1GOG',
+    subtitle: 'GAO-mut321 parent · Fusarium graminearum · drag to rotate · scroll to zoom',
+    hotspots: [
+      { resi: range(548,605), color: '#e84444', label: '548–605 hotspot' },
+      { resi: range(267,305), color: '#f5a623', label: '267–305 hotspot' },
+      { resi: range(430,436), color: '#44bb77', label: '430–436 hotspot' },
+    ],
+    activeSite: [228,272,290,406,495,496,531,581],
+    cofactors: [{ resn: 'CU', color: '#aa44ff', label: 'Cu²⁺', radius: 1.4 }],
+  },
+  gox: {
+    file: '1cf3_backbone.pdb',
+    title: 'Glucose oxidase · PDB 1CF3',
+    subtitle: 'Aspergillus niger · drag to rotate · scroll to zoom',
+    hotspots: [],
+    activeSite: [516, 559],
+    cofactors: [
+      { resn: 'FAD', color: '#f5c518', label: 'FAD cofactor', radius: 0.6 },
+    ],
+  },
+  hrp: {
+    file: '1atj_backbone.pdb',
+    title: 'Horseradish peroxidase C1A · PDB 1ATJ',
+    subtitle: 'Armoracia rusticana · drag to rotate · scroll to zoom',
+    hotspots: [],
+    activeSite: [38, 40, 170],
+    cofactors: [
+      { resn: 'HEM', color: '#cc3333', label: 'Heme', radius: 0.6 },
+      { resn: 'CA',  color: '#88ccff', label: 'Ca²⁺', radius: 1.0 },
+    ],
+  },
+};
+
+function range(a, b) { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; }
+
+let viewer, spinning = false, currentStyle = 'cartoon', currentBg = 'black', currentEnzyme = 'gao';
+
+function buildLegend(cfg) {
+  const el = document.getElementById('legend');
+  el.innerHTML = `<div class="legend-item"><span class="dot" style="background:#6699cc"></span>backbone</div>`;
+  cfg.hotspots.forEach(h => {
+    el.innerHTML += `<div class="legend-item"><span class="dot" style="background:${h.color}"></span>${h.label}</div>`;
+  });
+  cfg.cofactors.forEach(c => {
+    el.innerHTML += `<div class="legend-item"><span class="dot round" style="background:${c.color}"></span>${c.label}</div>`;
+  });
+}
 
 function applyStyles() {
   if (!viewer) return;
+  const cfg = ENZYMES[currentEnzyme];
   viewer.setStyle({}, {});
   const fn = s => currentStyle === 'cartoon' ? {cartoon:{color:s}} : {line:{color:s,linewidth:1.5}};
   viewer.setStyle({chain:'A'}, fn('#6699cc'));
-  viewer.setStyle({chain:'A',resi:r548}, fn('#e84444'));
-  viewer.setStyle({chain:'A',resi:r267}, fn('#f5a623'));
-  viewer.setStyle({chain:'A',resi:r430}, fn('#44bb77'));
-  if (currentStyle === 'cartoon') viewer.addStyle({chain:'A',resi:activeSite},{stick:{color:'#ffffff',radius:0.25}});
-  viewer.setStyle({resn:'CU'}, {sphere:{color:'#aa44ff',radius:1.4}});
+  cfg.hotspots.forEach(h => viewer.setStyle({chain:'A', resi: h.resi}, fn(h.color)));
+  if (currentStyle === 'cartoon' && cfg.activeSite.length) {
+    viewer.addStyle({chain:'A', resi: cfg.activeSite}, {stick:{color:'#ffffff', radius:0.25}});
+  }
+  cfg.cofactors.forEach(c => viewer.setStyle({resn: c.resn}, {sphere:{color:c.color, radius:c.radius}}));
   viewer.render();
 }
 
@@ -118,9 +170,9 @@ function setBg(mode) {
   ['bgBlack','bgWhite','bgTransp'].forEach(id => document.getElementById(id).classList.remove('active'));
   document.getElementById(mode === 'black' ? 'bgBlack' : mode === 'white' ? 'bgWhite' : 'bgTransp').classList.add('active');
   const el = document.getElementById('viewer');
-  if (mode === 'black') { el.style.background = '#000'; viewer && viewer.setBackgroundColor(0x000000, 1); }
-  else if (mode === 'white') { el.style.background = '#fff'; viewer && viewer.setBackgroundColor(0xffffff, 1); }
-  else { el.style.background = 'transparent'; viewer && viewer.setBackgroundColor(0x000000, 0); }
+  if (mode === 'black')       { el.style.background = '#000'; viewer && viewer.setBackgroundColor(0x000000, 1); }
+  else if (mode === 'white')  { el.style.background = '#fff'; viewer && viewer.setBackgroundColor(0xffffff, 1); }
+  else                        { el.style.background = 'transparent'; viewer && viewer.setBackgroundColor(0x000000, 0); }
   viewer && viewer.render();
 }
 
@@ -133,6 +185,37 @@ function toggleSpin() {
 }
 function doSpin() { if (!spinning || !viewer) return; viewer.rotate(0.8, 'y'); viewer.render(); requestAnimationFrame(doSpin); }
 
+function loadEnzyme(key) {
+  spinning = false;
+  document.getElementById('spinBtn').textContent = 'spin: off';
+  currentEnzyme = key;
+  const cfg = ENZYMES[key];
+  document.getElementById('hdr-title').textContent = cfg.title;
+  document.getElementById('hdr-subtitle').textContent = cfg.subtitle;
+  buildLegend(cfg);
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('loading').textContent = 'Loading structure…';
+  document.getElementById('output').style.display = 'none';
+
+  if (viewer) { viewer.clear(); }
+
+  fetch(BASE + cfg.file)
+    .then(r => r.text())
+    .then(pdb => {
+      document.getElementById('loading').style.display = 'none';
+      if (!viewer) {
+        viewer = $3Dmol.createViewer(document.getElementById('viewer'), {backgroundColor:'#000000', backgroundAlpha:1});
+      }
+      viewer.addModel(pdb, 'pdb');
+      applyStyles();
+      viewer.zoomTo();
+      viewer.render();
+      // Re-apply current background
+      setBg(currentBg);
+    })
+    .catch(e => { document.getElementById('loading').textContent = 'Error: ' + e.message; });
+}
+
 function getPNG() { viewer.render(); return viewer.pngURI(); }
 
 async function copyPNG() {
@@ -142,21 +225,20 @@ async function copyPNG() {
     const res = await fetch(getPNG());
     const blob = await res.blob();
     await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
-    status.textContent = '✓ copied — paste anywhere';
+    status.textContent = '✓ copied';
     setTimeout(() => status.textContent = '', 3000);
   } catch(e) {
-    status.textContent = 'Clipboard blocked — use save PNG instead';
+    status.textContent = 'Clipboard blocked — use save PNG';
   }
 }
 
 function savePNG() {
   if (!viewer) return;
+  const cfg = ENZYMES[currentEnzyme];
   const a = document.createElement('a');
   a.href = getPNG();
-  a.download = 'GAO_1GOG.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.download = cfg.file.replace('_backbone.pdb','') + '.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 function showOutput(hint, html) {
@@ -168,19 +250,13 @@ function showOutput(hint, html) {
 }
 
 function captureFrames(nFrames, degStep, msPerFrame, onDone) {
-  // Force solid background during capture — transparent WebGL has premultiplied alpha artifacts
   const wasBg = currentBg;
-  if (currentBg === 'transparent') {
-    viewer.setBackgroundColor(0x000000, 1);
-    viewer.render();
-  }
+  if (currentBg === 'transparent') { viewer.setBackgroundColor(0x000000, 1); viewer.render(); }
   const uris = []; let f = 0;
   function next() {
     if (f >= nFrames) {
-      // Restore background
       if (wasBg === 'transparent') { viewer.setBackgroundColor(0x000000, 0); viewer.render(); }
-      onDone(uris);
-      return;
+      onDone(uris); return;
     }
     document.getElementById('status').textContent = `capturing frame ${f+1}/${nFrames}…`;
     viewer.rotate(degStep, 'y'); viewer.render();
@@ -188,7 +264,6 @@ function captureFrames(nFrames, degStep, msPerFrame, onDone) {
   }
   next();
 }
-
 
 function startVideo() {
   if (!viewer) return;
@@ -215,7 +290,8 @@ function startVideo() {
       btn.disabled = false; status.textContent = '';
       spinning = wasSpinning; if (wasSpinning) doSpin();
       const url = URL.createObjectURL(new Blob(chunks, {type: mime}));
-      showOutput('Right-click the video → Save video as… to download', `<video src="${url}" controls autoplay loop style="width:100%;max-width:600px;"></video>`);
+      showOutput('Right-click the video → Save video as… to download',
+        `<video src="${url}" controls autoplay loop style="width:100%;max-width:800px;"></video>`);
     };
     rec.start();
     let i = 0;
@@ -229,17 +305,8 @@ function startVideo() {
   });
 }
 
-fetch('1gog_backbone.pdb')
-  .then(r => r.text())
-  .then(pdb => {
-    document.getElementById('loading').style.display = 'none';
-    viewer = $3Dmol.createViewer(document.getElementById('viewer'), {backgroundColor:'#000000', backgroundAlpha:1});
-    viewer.addModel(pdb, 'pdb');
-    applyStyles();
-    viewer.zoomTo();
-    viewer.render();
-  })
-  .catch(e => { document.getElementById('loading').textContent = 'Error loading structure: ' + e.message; });
+// Initial load
+loadEnzyme('gao');
 </script>
 </body>
 </html>
