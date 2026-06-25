@@ -26,6 +26,10 @@
   .sep { width: 1px; height: 20px; background: #2a2a2a; margin: 0 4px; }
   #status { font-size: 12px; color: #888; margin-left: 8px; }
   #rec { display: none; font-size: 11px; color: #ff4444; position: absolute; top: 12px; right: 14px; font-weight: 500; }
+  #output { display: none; padding: 16px 20px; background: #1a1a1a; border-top: 1px solid #2a2a2a; }
+  #output p { font-size: 12px; color: #888; margin-bottom: 10px; }
+  #output img, #output video { max-width: 100%; border-radius: 6px; display: block; }
+  #output video { background: #000; }
 </style>
 </head>
 <body>
@@ -75,6 +79,11 @@
     <button onclick="startVideo()" id="vidBtn">save video (5s)</button>
   </div>
   <span id="status"></span>
+</div>
+
+<div id="output">
+  <p id="output-hint"></p>
+  <div id="output-content"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/3dmol@2.0.3/build/3Dmol-min.js"></script>
@@ -152,6 +161,14 @@ function savePNG() {
   document.body.removeChild(a);
 }
 
+function showOutput(hint, html) {
+  const panel = document.getElementById('output');
+  document.getElementById('output-hint').textContent = hint;
+  document.getElementById('output-content').innerHTML = html;
+  panel.style.display = 'block';
+  panel.scrollIntoView({behavior: 'smooth'});
+}
+
 function captureFrames(nFrames, degStep, msPerFrame, onDone) {
   const uris = []; let f = 0;
   function next() {
@@ -185,9 +202,7 @@ function startGIF() {
       spinning = wasSpinning; if (wasSpinning) doSpin();
       if (result.error) { status.textContent = 'GIF error: ' + result.errorCode; return; }
       status.textContent = '';
-      const a = document.createElement('a');
-      a.href = result.image; a.download = 'GAO_1GOG_360.gif';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showOutput('Right-click the GIF → Save image as… to download', `<img src="${result.image}" alt="GAO rotating GIF">`);
     });
   });
 }
@@ -215,10 +230,8 @@ function startVideo() {
       document.getElementById('rec').style.display = 'none';
       btn.disabled = false; status.textContent = '';
       spinning = wasSpinning; if (wasSpinning) doSpin();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(chunks, {type: mime}));
-      a.download = 'GAO_1GOG.webm';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      const url = URL.createObjectURL(new Blob(chunks, {type: mime}));
+      showOutput('Right-click the video → Save video as… to download', `<video src="${url}" controls autoplay loop style="width:100%;max-width:600px;"></video>`);
     };
     rec.start();
     let i = 0;
