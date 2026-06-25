@@ -192,7 +192,8 @@ async function startGIF() {
 
     captureFrames(24, 15, 100, async uris => {
       status.textContent = 'encoding GIF…';
-      const W = 600, H = 500;
+      const W = document.getElementById('viewer').clientWidth;
+      const H = document.getElementById('viewer').clientHeight;
       const tmp = document.createElement('canvas');
       tmp.width = W; tmp.height = H;
       const ctx = tmp.getContext('2d');
@@ -230,9 +231,10 @@ function startVideo() {
   document.getElementById('rec').style.display = 'block';
 
   const fps = 25, totalFrames = 5 * fps;
+  const viewerEl = document.getElementById('viewer');
+  const W = viewerEl.clientWidth, H = viewerEl.clientHeight;
   captureFrames(totalFrames, 360 / totalFrames, 1000 / fps, uris => {
     status.textContent = 'encoding video…';
-    const W = 600, H = 500;
     const proxy = document.createElement('canvas');
     proxy.width = W; proxy.height = H;
     const ctx = proxy.getContext('2d');
